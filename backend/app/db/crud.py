@@ -6,6 +6,9 @@ from . import models, schemas
 from app.core.security import get_password_hash
 
 
+# ToDo: Should ownership of users and folder be enforced here?
+# ToDo: Should 404 errors be generated at the get_{model} level?
+
 def get_user(db: Session, user_id: int):
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
@@ -67,3 +70,79 @@ def edit_user(
     db.commit()
     db.refresh(db_user)
     return db_user
+
+
+def get_user_folders(db: Session, user_id: int):
+    return db.query(models.Folder).filter(models.Folder.owner_id == user_id).all()
+
+def get_folder(db: Session, folder_id: int):
+    return db.query(models.Folder).filter(models.Folder.id == folder_id and models.Folder.owner_id == user_id).first()
+
+def create_folder(db: Session, folder: schemas.FolderCreate, user_id: int):
+    db_folder = models.Folder(**folder.dict())
+    db.add(db_folder)
+    db.commit()
+    db.refresh(db_folder)
+    return db_folder
+
+
+def edit_folder(db: Session, folder_id: int, folder: schemas.FolderEdit):
+    db_folder = get_folder(db, folder_id)
+    if not db_folder:
+        raise HTTPException(404, "Folder not found.")
+    folder_data = folder.dict(exclude_unset=True)
+    for key, value in folder_data:
+        setattr(db_folder, key, value)
+
+    db.add(db_folder)
+    db.commit()
+    db.refresh(db_folder)
+
+    return db_folder
+
+def delete_folder(db: Session, folder_id: int):
+    db_folder = get_folder(db, folder_id)
+    if not db_folder:
+        raise HTTPException(404, "Folder not found.")
+
+    db.delete(db_folder)
+    db.commit()
+
+def get_folder_notes(db: Session, folder_id: int):
+    return db.query(models.Note).filter(models.Note.parent_folder_id == folder_id).all()
+
+
+def get_note(db: Session, note_id: int):
+    return db.query(models.Note).filter(models.Note.id == note_id).first()
+
+
+def create_note(db: Session, note: schemas.NoteCreate, user_id: int, folder_id: int):
+    db_note = models.Note(**note.dict())
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    return db_note
+
+
+def edit_note(db: Session, note_id: int, note: schemas.NoteEdit):
+    db_note = get_note(db, note_id)
+    if not db_note:
+        raise HTTPException(404, "Note not found.")
+    note_data = note.dict(exclude_unset=True)
+    # created should not be changed
+    for key, value in note_data:
+        setattr(db_note, key, value)
+
+    db.add(db_note)
+    db.commit()
+    db.refresh(db_note)
+    return db_note
+
+
+def delete_note(db: Session, note_id: int):
+    db_note = get_note(db, note_id)
+    if not db_note:
+        raise HTTPException(404, "Note not found.")
+
+    db.delete(db_note)
+    db.commit()
